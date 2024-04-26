@@ -126,8 +126,7 @@ export const SortingControlContainer = styled.div<{
   display: flex;
   align-items: center;
   color: ${props => (props.isActive ? color("text-dark") : "")};
-  ${props => (props.isSortable ? `cursor: pointer;` : "")}
-  user-select: none;
+  ${props => (props.isSortable ? `cursor: pointer; user-select: none;` : "")}
 
   .Icon {
     visibility: ${props => (props.isActive ? "visible" : "hidden")};

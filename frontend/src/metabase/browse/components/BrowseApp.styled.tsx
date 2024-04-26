@@ -6,7 +6,7 @@ import {
   breakpointMinMedium,
   breakpointMinSmall,
 } from "metabase/styled-components/theme";
-import { Grid, Icon, Tabs } from "metabase/ui";
+import { Flex, Grid, Icon, Tabs } from "metabase/ui";
 
 export const BrowseAppRoot = styled.div`
   flex: 1;
@@ -38,27 +38,38 @@ export const BrowseTab = styled(Tabs.Tab)`
   }
 `;
 
-export const BrowseTabsPanel = styled(Tabs.Panel)`
+export const BrowseContainer = styled.div`
+  display: flex;
+  flex: 1;
+  flex-flow: column nowrap;
+  min-height: 100%;
+  margin-top: 1rem;
+
+  container-name: ItemsTableContainer;
+  container-type: inline-size;
+`;
+
+export const BrowseSection = styled(Flex)`
+  max-width: 64rem;
+  margin: 0 auto;
+  width: 100%;
+`;
+
+export const BrowseHeader = styled.header`
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 2.5rem;
+  padding-bottom: 0.375rem;
+  color: ${color("dark")};
+`;
+
+export const BrowseMain = styled.main`
   display: flex;
   flex-flow: column nowrap;
   flex: 1;
   height: 100%;
   padding: 0 2.5rem;
-`;
-
-export const BrowseContainer = styled.div`
-  display: flex;
-  flex: 1;
-  flex-flow: column nowrap;
-  height: 100%;
-`;
-
-export const BrowseDataHeader = styled.header`
-  display: flex;
-  padding: 1rem 2.5rem;
-  padding-bottom: 0.375rem;
-  color: ${color("dark")};
-  background-color: ${color("white")};
+  padding-bottom: 2rem;
 `;
 
 export const BrowseGrid = styled(Grid)`

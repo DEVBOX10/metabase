@@ -1,105 +1,176 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { t } from "ttag";
+import _ from "underscore";
 
 import NoResults from "assets/img/no_results.svg";
-import type { useSearchListQuery } from "metabase/common/hooks";
+import { useSearchQuery } from "metabase/api";
+import type { SortingOptions } from "metabase/collections/components/BaseItemsTable";
+import { ColumnHeader } from "metabase/collections/components/BaseItemsTable.styled";
+import ItemsTable from "metabase/collections/components/ItemsTable";
 import LoadingAndErrorWrapper from "metabase/components/LoadingAndErrorWrapper";
-import { useSelector } from "metabase/lib/redux";
-import { getLocale } from "metabase/setup/selectors";
-import { Box } from "metabase/ui";
-import type { SearchResult, CollectionId } from "metabase-types/api";
+import Search from "metabase/entities/search";
+import { color } from "metabase/lib/colors";
+import { useDispatch } from "metabase/lib/redux";
+import { PLUGIN_CONTENT_VERIFICATION } from "metabase/plugins";
+import { Box, Flex, Group, Icon, Stack, Title } from "metabase/ui";
 
-import { BROWSE_MODELS_LOCALSTORAGE_KEY } from "../constants";
-import { getCollectionViewPreferences, groupModels } from "../utils";
+import { filterModels, type ActualModelFilters } from "../utils";
 
-import { CenteredEmptyState } from "./BrowseApp.styled";
-import { ModelGrid } from "./BrowseModels.styled";
+import {
+  BrowseContainer,
+  BrowseHeader,
+  BrowseMain,
+  BrowseSection,
+  CenteredEmptyState,
+} from "./BrowseApp.styled";
+import BrowseTableItem from "./BrowseTableItem";
 import { ModelExplanationBanner } from "./ModelExplanationBanner";
-import { ModelGroup } from "./ModelGroup";
 
-export const BrowseModels = ({
-  modelsResult,
-}: {
-  modelsResult: ReturnType<typeof useSearchListQuery<SearchResult>>;
-}) => {
-  const { data: models = [], error, isLoading } = modelsResult;
-  const locale = useSelector(getLocale);
-  const localeCode: string | undefined = locale?.code;
-  const [collectionViewPreferences, setCollectionViewPreferences] = useState(
-    getCollectionViewPreferences,
+const availableModelFilters = PLUGIN_CONTENT_VERIFICATION.availableModelFilters;
+
+export const BrowseModels = () => {
+  const getInitialModelFilters = () => {
+    return _.reduce(
+      availableModelFilters,
+      (acc, filter, filterName) => {
+        const storedFilterStatus = localStorage.getItem(
+          `browseFilters.${filterName}`,
+        );
+        const shouldFilterBeActive =
+          storedFilterStatus === null
+            ? filter.activeByDefault
+            : storedFilterStatus === "on";
+        return {
+          ...acc,
+          [filterName]: shouldFilterBeActive,
+        };
+      },
+      {},
+    );
+  };
+
+  const [actualModelFilters, setActualModelFilters] =
+    useState<ActualModelFilters>(getInitialModelFilters);
+
+  const handleModelFilterChange = useCallback(
+    (modelFilterName: string, active: boolean) => {
+      localStorage.setItem(
+        `browseFilters.${modelFilterName}`,
+        active ? "on" : "off",
+      );
+      setActualModelFilters((prev: ActualModelFilters) => {
+        return { ...prev, [modelFilterName]: active };
+      });
+    },
+    [setActualModelFilters],
   );
 
-  if (error || isLoading) {
+  return (
+    <BrowseContainer>
+      <BrowseHeader>
+        <BrowseSection>
+          <Flex w="100%" direction="row" justify="space-between" align="center">
+            <Title order={1} color="text-dark">
+              <Group spacing="sm">
+                <Icon size={18} color={color("brand")} name="model" />
+                {t`Models`}
+              </Group>
+            </Title>
+            <PLUGIN_CONTENT_VERIFICATION.ModelFilterControls
+              actualModelFilters={actualModelFilters}
+              handleModelFilterChange={handleModelFilterChange}
+            />
+          </Flex>
+        </BrowseSection>
+      </BrowseHeader>
+      <BrowseMain>
+        <BrowseSection>
+          <BrowseModelsBody actualModelFilters={actualModelFilters} />
+        </BrowseSection>
+      </BrowseMain>
+    </BrowseContainer>
+  );
+};
+
+export const BrowseModelsBody = ({
+  actualModelFilters,
+}: {
+  actualModelFilters: ActualModelFilters;
+}) => {
+  const dispatch = useDispatch();
+  const { data, error, isFetching } = useSearchQuery({
+    models: ["dataset"],
+    model_ancestors: true,
+    filter_items_in_personal_collection: "exclude",
+  });
+  const unfilteredModels = data?.data;
+
+  const models = useMemo(
+    () =>
+      filterModels(
+        unfilteredModels || [],
+        actualModelFilters,
+        availableModelFilters,
+      ),
+    [unfilteredModels, actualModelFilters],
+  );
+
+  const sortingOptions: SortingOptions = {
+    sort_column: "name",
+    sort_direction: "asc",
+  };
+  const wrappedModels = models.map(model => Search.wrapEntity(model, dispatch));
+
+  if (error || isFetching) {
     return (
       <LoadingAndErrorWrapper
         error={error}
-        loading={isLoading}
+        loading={isFetching}
         style={{ display: "flex", flex: 1 }}
       />
     );
   }
 
-  const handleToggleCollectionExpand = (collectionId: CollectionId) => {
-    const newPreferences = {
-      ...collectionViewPreferences,
-      [collectionId]: {
-        expanded: !(
-          collectionViewPreferences?.[collectionId]?.expanded ?? true
-        ),
-        showAll: !!collectionViewPreferences?.[collectionId]?.showAll,
-      },
-    };
-    setCollectionViewPreferences(newPreferences);
-    localStorage.setItem(
-      BROWSE_MODELS_LOCALSTORAGE_KEY,
-      JSON.stringify(newPreferences),
-    );
-  };
-
-  const handleToggleCollectionShowAll = (collectionId: CollectionId) => {
-    const newPreferences = {
-      ...collectionViewPreferences,
-      [collectionId]: {
-        expanded: collectionViewPreferences?.[collectionId]?.expanded ?? true,
-        showAll: !collectionViewPreferences?.[collectionId]?.showAll,
-      },
-    };
-    setCollectionViewPreferences(newPreferences);
-    localStorage.setItem(
-      BROWSE_MODELS_LOCALSTORAGE_KEY,
-      JSON.stringify(newPreferences),
-    );
-  };
-
-  const groupsOfModels = groupModels(models, localeCode);
-
   if (models.length) {
     return (
-      <>
+      <Stack spacing="md" mb="lg">
         <ModelExplanationBanner />
-        <ModelGrid role="grid">
-          {groupsOfModels.map(groupOfModels => {
-            const collectionId = groupOfModels[0].collection.id;
-            return (
-              <ModelGroup
-                expanded={
-                  collectionViewPreferences?.[collectionId]?.expanded ?? true
-                }
-                showAll={!!collectionViewPreferences?.[collectionId]?.showAll}
-                toggleExpanded={() =>
-                  handleToggleCollectionExpand(collectionId)
-                }
-                toggleShowAll={() =>
-                  handleToggleCollectionShowAll(collectionId)
-                }
-                models={groupOfModels}
-                key={`modelgroup-${collectionId}`}
-                localeCode={localeCode}
-              />
-            );
-          })}
-        </ModelGrid>
-      </>
+        <ItemsTable
+          ItemComponent={BrowseTableItem}
+          items={wrappedModels}
+          sortingOptions={sortingOptions}
+          isSortable={false}
+          onSortingOptionsChange={() => {}}
+          customColumns={{
+            lastEditedBy: {
+              show: false,
+            },
+            lastEditedAt: {
+              show: false,
+            },
+            model: {
+              col: <col style={{ width: "3rem" }} />,
+              header: <th>&nbsp;</th>,
+            },
+            name: {
+              col: <col style={{ width: "12rem" }} />,
+            },
+            actionMenu: { show: false },
+            description: {
+              index: 3,
+              col: <col />,
+              header: <ColumnHeader>{t`Description`}</ColumnHeader>,
+              breakpoint: "sm",
+            },
+            collection: {
+              index: 4,
+              col: <col />,
+              header: <ColumnHeader>{t`Collection`}</ColumnHeader>,
+              breakpoint: "sm",
+            },
+          }}
+        />
+      </Stack>
     );
   }
 

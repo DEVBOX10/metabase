@@ -140,8 +140,8 @@ export const filterModels = (
 ) => {
   return _.reduce(
     actualModelFilters,
-    (acc, shouldFilterBeActive, filterName) =>
-      shouldFilterBeActive
+    (acc, isFilterActive, filterName) =>
+      isFilterActive
         ? acc.filter(availableModelFilters[filterName].predicate)
         : acc,
     unfilteredModels,

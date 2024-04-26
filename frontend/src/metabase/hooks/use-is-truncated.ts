@@ -2,6 +2,9 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 import resizeObserver from "metabase/lib/resize-observer";
 
+/**
+ * Note: Sometimes it might help to add a pixel of padding-top
+ * and/or padding-bottom to the element to make this work */
 export const useIsTruncated = <E extends Element>({
   disabled = false,
 }: { disabled?: boolean } = {}) => {
