@@ -215,6 +215,12 @@
   a schema standpoint, and from a 'do the referenced Collections exist' standpoint. Intended for use as part of
   `pre-update` and `pre-insert`."
   [{:keys [location], :as collection}]
+  ;; if setting/updating the `archived` of this collection, make sure it's also moving it to a valid location (the
+  ;; trash)
+  (when (and (:archived collection)
+             (not= location trash-path))
+    (let [msg (tru "Archived collections must be located in the trash")]
+      (throw (ex-info msg {:status-code 400, :errors {:location msg}}))))
   ;; if setting/updating the `location` of this Collection make sure it matches the schema for valid location paths
   (when (contains? collection :location)
     (when-not (valid-location-path? location)
