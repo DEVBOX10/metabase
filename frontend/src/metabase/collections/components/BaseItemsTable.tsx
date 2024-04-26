@@ -1,7 +1,17 @@
-import type { HTMLAttributes, PropsWithChildren } from "react";
+import { merge } from "icepick";
+import {
+  cloneElement,
+  isValidElement,
+  type Attributes,
+  type HTMLAttributes,
+  type PropsWithChildren,
+  type ReactNode,
+} from "react";
 import { t } from "ttag";
+import _ from "underscore";
 
 import CheckBox from "metabase/core/components/CheckBox";
+import type { breakpoints } from "metabase/ui/theme";
 import type Database from "metabase-lib/v1/metadata/Database";
 import type { Bookmark, Collection, CollectionItem } from "metabase-types/api";
 
@@ -29,22 +39,23 @@ export type SortingOptions = {
   sort_direction: "asc" | "desc";
 };
 
-interface SortableColumnHeaderProps
-  extends PropsWithChildren<Partial<HTMLAttributes<HTMLDivElement>>> {
+type SortableColumnHeaderProps = {
   name: string;
   sortingOptions: SortingOptions;
   onSortingOptionsChange: (newSortingOptions: SortingOptions) => void;
-}
+  isSortable?: boolean;
+} & PropsWithChildren<Partial<HTMLAttributes<HTMLDivElement>>>;
 
 export enum Sort {
   Asc = "asc",
   Desc = "desc",
 }
 
-const SortableColumnHeader = ({
+export const SortableColumnHeader = ({
   name,
   sortingOptions,
   onSortingOptionsChange,
+  isSortable = true,
   children,
   ...props
 }: SortableColumnHeaderProps) => {
@@ -68,15 +79,41 @@ const SortableColumnHeader = ({
         isActive={isSortingThisColumn}
         onClick={onSortingControlClick}
         role="button"
+        isSortable={isSortable}
       >
         {children}
-        <SortingIcon
-          name={direction === Sort.Asc ? "chevronup" : "chevrondown"}
-        />
+        {isSortable && (
+          <SortingIcon
+            name={direction === Sort.Asc ? "chevronup" : "chevrondown"}
+          />
+        )}
       </SortingControlContainer>
     </ColumnHeader>
   );
 };
+type Breakpoint = keyof typeof breakpoints;
+
+export type BaseItemsTableColumn = {
+  col?: ReactNode;
+  header?: ReactNode;
+  show?: boolean;
+  index?: number;
+  /** Below this container width, the column will be hidden */
+  breakpoint?: Breakpoint;
+};
+
+export enum ColumnId {
+  Select = "select",
+  Model = "model",
+  Name = "name",
+  LastEditedBy = "lastEditedBy",
+  LastEditedAt = "lastEditedAt",
+  ActionMenu = "actionMenu",
+  Description = "description",
+  Collection = "collection",
+  RightEdge = "rightEdge",
+}
+type BaseItemsTableColumnMap = Record<ColumnId, BaseItemsTableColumn>;
 
 export interface BaseItemsTableProps {
   items: CollectionItem[];
@@ -88,8 +125,9 @@ export interface BaseItemsTableProps {
   selectedItems?: CollectionItem[];
   hasUnselected?: boolean;
   isPinned?: boolean;
-  renderItem?: (props: ItemRendererProps) => JSX.Element;
+  ItemComponent?: (props: ItemRendererProps) => JSX.Element;
   sortingOptions: SortingOptions;
+  isSortable?: boolean;
   onSortingOptionsChange: (newSortingOptions: SortingOptions) => void;
   onToggleSelected?: OnToggleSelectedWithItem;
   onSelectAll?: () => void;
@@ -100,19 +138,132 @@ export interface BaseItemsTableProps {
   getIsSelected?: (item: any) => boolean;
   /** Used for dragging */
   headless?: boolean;
+  customColumns?: Partial<BaseItemsTableColumnMap>;
 }
 
-type ItemRendererProps = {
+export type ItemRendererProps = {
   item: CollectionItem;
 } & BaseTableItemProps;
 
-const defaultItemRenderer = ({ item, ...props }: ItemRendererProps) => {
+const withProps = (node: ReactNode, props: Attributes) =>
+  isValidElement(node) ? cloneElement(node, props) : node;
+
+const DefaultItemComponent = ({ item, ...props }: ItemRendererProps) => {
   return (
     <BaseTableItem key={`${item.model}-${item.id}`} item={item} {...props} />
   );
 };
 
+const getDefaultColumns = (
+  props: Pick<
+    BaseItemsTableProps,
+    | "sortingOptions"
+    | "onSortingOptionsChange"
+    | "selectedItems"
+    | "hasUnselected"
+    | "onSelectAll"
+    | "onSelectNone"
+    | "isSortable"
+  >,
+) => {
+  const defaultColumns: Partial<BaseItemsTableColumnMap> = {};
+  const {
+    sortingOptions,
+    onSortingOptionsChange,
+    selectedItems,
+    hasUnselected,
+    onSelectAll,
+    onSelectNone,
+    isSortable: isSortable,
+  } = props;
+  const sortableColumnHeaderProps = {
+    sortingOptions,
+    onSortingOptionsChange,
+    isSortable,
+  };
+  defaultColumns.select = {
+    index: 0,
+    col: <col style={{ width: "70px" }} />,
+    header: (
+      <ColumnHeader>
+        <BulkSelectWrapper>
+          <CheckBox
+            checked={!!selectedItems?.length}
+            indeterminate={!!selectedItems?.length && !!hasUnselected}
+            onChange={hasUnselected ? onSelectAll : onSelectNone}
+            aria-label={t`Select all items`}
+          />
+        </BulkSelectWrapper>
+      </ColumnHeader>
+    ),
+  };
+  defaultColumns.model = {
+    index: 1,
+    col: <col style={{ width: "70px" }} />,
+    header: (
+      <SortableColumnHeader
+        name="model"
+        style={{ marginInlineStart: 6 }}
+        {...sortableColumnHeaderProps}
+      >
+        {t`Type`}
+      </SortableColumnHeader>
+    ),
+  };
+  defaultColumns.name = {
+    index: 2,
+    col: <col />,
+    header: (
+      <SortableColumnHeader name="name" {...sortableColumnHeaderProps}>
+        {t`Name`}
+      </SortableColumnHeader>
+    ),
+  };
+  defaultColumns.lastEditedBy = {
+    index: 3,
+    col: <LastEditedByCol />,
+    header: (
+      <SortableColumnHeader
+        name="last_edited_by"
+        {...sortableColumnHeaderProps}
+      >
+        {t`Last edited by`}
+      </SortableColumnHeader>
+    ),
+    breakpoint: "sm",
+  };
+  defaultColumns.lastEditedAt = {
+    index: 4,
+    col: <col style={{ width: "140px" }} />,
+    header: (
+      <SortableColumnHeader
+        name="last_edited_at"
+        {...sortableColumnHeaderProps}
+      >
+        {t`Last edited at`}
+      </SortableColumnHeader>
+    ),
+    breakpoint: "md",
+  };
+  defaultColumns.actionMenu = {
+    index: 5,
+    header: <th></th>,
+    col: <col style={{ width: "50px" }} />,
+  };
+  // Just for applying a border-radius to the right edge
+  defaultColumns.rightEdge = {
+    index: 6,
+    header: <th></th>,
+    col: <col style={{ width: "1rem" }} />,
+  };
+  return defaultColumns;
+};
+
+const sortColumnByIndex = (a: BaseItemsTableColumn, b: BaseItemsTableColumn) =>
+  (a.index ?? 0) - (b.index ?? 0);
+
 const BaseItemsTable = ({
+  customColumns,
   databases,
   bookmarks,
   createBookmark,
@@ -122,12 +273,13 @@ const BaseItemsTable = ({
   selectedItems,
   hasUnselected,
   isPinned,
-  renderItem = defaultItemRenderer,
+  ItemComponent = DefaultItemComponent,
   onCopy,
   onMove,
   onDrop,
   sortingOptions,
   onSortingOptionsChange,
+  isSortable: isSortable = true,
   onToggleSelected,
   onSelectAll,
   onSelectNone,
@@ -135,88 +287,83 @@ const BaseItemsTable = ({
   headless = false,
   ...props
 }: BaseItemsTableProps) => {
-  const itemRenderer = (item: CollectionItem) =>
-    renderItem({
-      databases,
-      bookmarks,
-      createBookmark,
-      deleteBookmark,
-      item,
-      collection,
-      selectedItems,
-      isSelected: getIsSelected(item),
-      isPinned,
-      onCopy,
-      onMove,
-      onDrop,
-      onToggleSelected,
-    });
+  const defaultColumns = getDefaultColumns({
+    sortingOptions,
+    onSortingOptionsChange,
+    selectedItems,
+    hasUnselected,
+    onSelectAll,
+    onSelectNone,
+    isSortable,
+  });
+  const columns: Partial<BaseItemsTableColumnMap> = merge(
+    defaultColumns,
+    customColumns,
+  );
 
   const canSelect = !!collection?.can_write;
 
+  if (!canSelect) {
+    columns.select ??= {};
+    columns.select.show = false;
+  }
+
+  const shownColumns = _.filter(columns, column => column.show !== false);
+  const columnData = _.map(
+    shownColumns,
+    ({ col, header, index, breakpoint }, colId) => {
+      return {
+        col: withProps(col, { key: colId }),
+        header: withProps(header, { key: colId }),
+        index,
+        breakpoint,
+      };
+    },
+  );
+  columnData.sort(sortColumnByIndex);
+  const colElements: ReactNode[] = _.pluck(columnData, "col");
+  const headerElements: ReactNode[] = _.pluck(columnData, "header");
+  const columnBreakpoints = _.pluck(columnData, "breakpoint");
+
   return (
-    <Table canSelect={canSelect} {...props}>
-      <colgroup>
-        {canSelect && <col style={{ width: "70px" }} />}
-        <col style={{ width: "70px" }} />
-        <col />
-        <LastEditedByCol />
-        <col style={{ width: "140px" }} />
-        <col style={{ width: "100px" }} />
-      </colgroup>
+    <Table
+      canSelect={canSelect}
+      columnBreakpoints={columnBreakpoints}
+      {...props}
+    >
+      <colgroup>{colElements}</colgroup>
       {!headless && (
         <thead
           data-testid={
             isPinned ? "pinned-items-table-head" : "items-table-head"
           }
         >
-          <tr>
-            {canSelect && (
-              <ColumnHeader>
-                <BulkSelectWrapper>
-                  <CheckBox
-                    checked={!!selectedItems?.length}
-                    indeterminate={!!selectedItems?.length && hasUnselected}
-                    onChange={hasUnselected ? onSelectAll : onSelectNone}
-                    aria-label={t`Select all items`}
-                  />
-                </BulkSelectWrapper>
-              </ColumnHeader>
-            )}
-            <SortableColumnHeader
-              name="model"
-              sortingOptions={sortingOptions}
-              onSortingOptionsChange={onSortingOptionsChange}
-              style={{ marginInlineStart: 6 }}
-            >
-              {t`Type`}
-            </SortableColumnHeader>
-            <SortableColumnHeader
-              name="name"
-              sortingOptions={sortingOptions}
-              onSortingOptionsChange={onSortingOptionsChange}
-            >
-              {t`Name`}
-            </SortableColumnHeader>
-            <SortableColumnHeader
-              name="last_edited_by"
-              sortingOptions={sortingOptions}
-              onSortingOptionsChange={onSortingOptionsChange}
-            >
-              {t`Last edited by`}
-            </SortableColumnHeader>
-            <SortableColumnHeader
-              name="last_edited_at"
-              sortingOptions={sortingOptions}
-              onSortingOptionsChange={onSortingOptionsChange}
-            >
-              {t`Last edited at`}
-            </SortableColumnHeader>
-            <th></th>
-          </tr>
+          <tr>{headerElements}</tr>
         </thead>
       )}
-      <TBody>{items.map(itemRenderer)}</TBody>
+      <TBody>
+        {items.map((item: CollectionItem) => {
+          return (
+            <ItemComponent
+              key={`${item.model}-${item.id}`}
+              item={item}
+              databases={databases}
+              bookmarks={bookmarks}
+              createBookmark={createBookmark}
+              deleteBookmark={deleteBookmark}
+              collection={collection}
+              selectedItems={selectedItems}
+              isSelected={getIsSelected(item)}
+              isPinned={isPinned}
+              onCopy={onCopy}
+              onMove={onMove}
+              onDrop={onDrop}
+              onToggleSelected={onToggleSelected}
+              shouldShowActionMenu={columns.actionMenu?.show ?? true}
+            />
+          );
+        })}
+      </TBody>
     </Table>
   );
 };

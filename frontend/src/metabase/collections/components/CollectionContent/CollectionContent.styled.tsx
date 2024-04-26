@@ -4,6 +4,8 @@ export const CollectionRoot = styled.div`
   height: 100%;
   overflow: hidden;
   position: relative;
+  container-name: ItemsTableContainer;
+  container-type: inline-size;
 `;
 
 export const CollectionMain = styled.div`

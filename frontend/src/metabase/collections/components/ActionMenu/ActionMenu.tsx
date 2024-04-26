@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { connect } from "react-redux";
 
 import type {
@@ -103,9 +103,15 @@ function ActionMenu({
     item.setArchived?.(true);
   }, [item]);
 
-  const handleToggleBookmark = useCallback(() => {
-    const toggleBookmark = isBookmarked ? deleteBookmark : createBookmark;
-    toggleBookmark?.(item.id.toString(), normalizeItemModel(item));
+  const handleToggleBookmark = useMemo(() => {
+    if (!createBookmark && !deleteBookmark) {
+      return undefined;
+    }
+    const handler = () => {
+      const toggleBookmark = isBookmarked ? deleteBookmark : createBookmark;
+      toggleBookmark?.(item.id.toString(), normalizeItemModel(item));
+    };
+    return handler;
   }, [createBookmark, deleteBookmark, isBookmarked, item]);
 
   const handleTogglePreview = useCallback(() => {

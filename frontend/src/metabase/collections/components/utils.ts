@@ -1,3 +1,4 @@
+import type { BreakpointName } from "metabase/ui/theme";
 import type { CollectionItem } from "metabase-types/api";
 
 export const findLastEditedCollectionItem = (
@@ -17,4 +18,32 @@ export const findLastEditedCollectionItem = (
 
     return latest;
   });
+};
+
+export const getCSSForColumnBreakpoints = (
+  breakpoints: Record<BreakpointName, string>,
+  columnBreakpoints: (BreakpointName | undefined)[],
+  containerName: string,
+) => {
+  const ret = Object.entries(breakpoints)
+    .map(([breakpointName, value]) => {
+      const cssForColumn = columnBreakpoints
+        .map((columnBreakpointName: BreakpointName | undefined, index) =>
+          columnBreakpointName === breakpointName
+            ? `col, th, td {
+              &:nth-of-type(${index + 1}) {
+                display: none;
+              }
+            }`
+            : "",
+        )
+        .join("\n")
+        .trim();
+      return cssForColumn
+        ? `@container ${containerName} (max-width: ${value}) { ${cssForColumn} }`
+        : "";
+    })
+    .join("\n");
+
+  return ret;
 };

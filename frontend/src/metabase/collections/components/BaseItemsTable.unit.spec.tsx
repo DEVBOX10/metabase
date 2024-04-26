@@ -43,6 +43,7 @@ function getCollectionItem({
     model,
     description,
     name,
+    collection: createMockCollection({ can_write: true }),
     getIcon: () => ({
       name: icon,
     }),
@@ -50,7 +51,7 @@ function getCollectionItem({
   };
 }
 
-describe("Collections BaseItemsTable", () => {
+describe("BaseItemsTable", () => {
   const ITEM = getCollectionItem();
 
   function setup({
@@ -181,5 +182,54 @@ describe("Collections BaseItemsTable", () => {
         "/model/1-order/detail",
       );
     });
+  });
+
+  it("has customizable columns", () => {
+    const customColumns = {
+      lastEditedBy: {
+        show: false,
+      },
+      lastEditedAt: {
+        show: false,
+      },
+      actionMenu: { show: false },
+      model: {
+        header: <th>Model</th>,
+      },
+      description: {
+        index: 3,
+        col: <col />,
+        header: <th>Description</th>,
+      },
+      collection: {
+        index: 4,
+        col: <col />,
+        header: <th>Collection</th>,
+      },
+    };
+    setup({
+      customColumns,
+      ItemComponent: ({ item }: { item: CollectionItem }) => (
+        <tr>
+          <td>{item.model}</td>
+          <td>{item.name}</td>
+          <td>{item.description}</td>
+          <td>{item.collection?.name}</td>
+        </tr>
+      ),
+    });
+    const tableHeadings = screen.getAllByRole("columnheader");
+    expect(tableHeadings).toHaveLength(5);
+    expect(tableHeadings[0]).toHaveTextContent("Model");
+    expect(tableHeadings[1]).toHaveTextContent("Name");
+    expect(tableHeadings[2]).toHaveTextContent("Description");
+    expect(tableHeadings[3]).toHaveTextContent("Collection");
+    const tableRows = screen.getAllByRole("row");
+    expect(tableRows).toHaveLength(2);
+    const tableCells = screen.getAllByRole("cell");
+    expect(tableCells[0]).toHaveTextContent("dashboard");
+    expect(tableCells[1]).toHaveTextContent("My Item");
+    expect(tableCells[2]).toHaveTextContent("A description");
+    expect(tableCells[3]).toHaveTextContent("Collection");
   });
 });

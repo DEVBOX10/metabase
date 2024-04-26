@@ -6,55 +6,43 @@ import Link from "metabase/core/components/Link";
 import AdminS from "metabase/css/admin.module.css";
 import { color } from "metabase/lib/colors";
 import BaseModelDetailLink from "metabase/models/components/ModelDetailLink";
-import {
-  breakpointMaxMedium,
-  breakpointMinLarge,
-} from "metabase/styled-components/theme/media-queries";
+import { breakpointMinLarge } from "metabase/styled-components/theme/media-queries";
 import { Icon } from "metabase/ui";
+import { breakpoints, type BreakpointName } from "metabase/ui/theme";
 
-const LAST_EDITED_BY_INDEX = 3;
-const LAST_EDITED_AT_INDEX = 4;
+import { getCSSForColumnBreakpoints } from "./utils";
 
-export const Table = styled.table<{ canSelect: boolean }>`
+export const Table = styled.table<{
+  canSelect: boolean;
+  columnBreakpoints?: (BreakpointName | undefined)[];
+}>`
   background-color: ${color("white")};
   table-layout: fixed;
   border-collapse: unset;
-  border-radius: 8px;
+  border-radius: 0.5rem;
 
   thead {
     th {
       border-top: 1px solid ${color("border")};
 
       &:first-of-type {
-        border-top-left-radius: 8px;
-        border-left: 1px solid ${color("border")};
+        border-start-start-radius: 8px;
+        border-inline-start: 1px solid ${color("border")};
       }
 
       &:last-child {
-        border-top-right-radius: 8px;
-        border-right: 1px solid ${color("border")};
+        border-start-end-radius: 8px;
+        border-inline-end: 1px solid ${color("border")};
       }
     }
   }
-
-  ${props => {
-    const offset = props.canSelect ? 1 : 0;
-    const offsetEditedByIndex = LAST_EDITED_BY_INDEX + offset;
-    const offsetEditedAtIndex = LAST_EDITED_AT_INDEX + offset;
-
-    return `
-      ${breakpointMaxMedium} {
-        & td:nth-of-type(${offsetEditedByIndex}),
-        th:nth-of-type(${offsetEditedByIndex}),
-        col:nth-of-type(${offsetEditedByIndex}),
-        td:nth-of-type(${offsetEditedAtIndex}),
-        th:nth-of-type(${offsetEditedAtIndex}),
-        col:nth-of-type(${offsetEditedAtIndex}) {
-          display: none;
-        }
-      }
-    `;
-  }}
+  ${props =>
+    props.columnBreakpoints?.length &&
+    getCSSForColumnBreakpoints(
+      breakpoints,
+      props.columnBreakpoints,
+      "ItemsTableContainer",
+    )}
 `;
 
 Table.defaultProps = { className: AdminS.ContentTable };
@@ -66,8 +54,8 @@ export const ColumnHeader = styled.th`
 `;
 
 export const BulkSelectWrapper = styled(IconButtonWrapper)`
-  padding-left: 12px;
-  padding-right: 12px;
+  padding-inline-start: 12px;
+  padding-inline-end: 12px;
   width: 3em;
 `;
 
@@ -115,7 +103,7 @@ export const ItemNameCell = styled.td`
 `;
 
 export const SortingIcon = styled(Icon)`
-  margin-left: 4px;
+  margin-inline-start: 4px;
 `;
 
 export const DescriptionIcon = styled(Icon)`
@@ -131,11 +119,14 @@ export const ModelDetailLink = styled(BaseModelDetailLink)`
   visibility: hidden;
 `;
 
-export const SortingControlContainer = styled.div<{ isActive: boolean }>`
+export const SortingControlContainer = styled.div<{
+  isActive: boolean;
+  isSortable?: boolean;
+}>`
   display: flex;
   align-items: center;
   color: ${props => (props.isActive ? color("text-dark") : "")};
-  cursor: pointer;
+  ${props => (props.isSortable ? `cursor: pointer;` : "")}
   user-select: none;
 
   .Icon {
@@ -150,6 +141,7 @@ export const SortingControlContainer = styled.div<{ isActive: boolean }>`
     }
   }
 `;
+SortingControlContainer.defaultProps = { isSortable: true };
 
 export const RowActionsContainer = styled.div`
   display: flex;
@@ -169,11 +161,11 @@ export const TBody = styled.tbody`
     border-top: 1px solid ${color("border")};
 
     &:first-of-type {
-      border-left: 1px solid ${color("border")};
+      border-inline-start: 1px solid ${color("border")};
     }
 
     &:last-child {
-      border-right: 1px solid ${color("border")};
+      border-inline-end: 1px solid ${color("border")};
     }
   }
 
@@ -186,11 +178,11 @@ export const TBody = styled.tbody`
       border-bottom: 1px solid ${color("border")};
 
       &:last-child {
-        border-bottom-right-radius: 8px;
+        border-end-end-radius: 8px;
       }
 
       &:first-of-type {
-        border-bottom-left-radius: 8px;
+        border-end-start-radius: 8px;
       }
     }
   }
