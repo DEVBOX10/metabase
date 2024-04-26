@@ -159,7 +159,7 @@ export const useCommandPaletteBasicActions = ({
         section: "basic",
         icon: "database",
         perform: () => {
-          dispatch(push("/browse/data"));
+          dispatch(push("/browse/databases"));
         },
       },
     ];
